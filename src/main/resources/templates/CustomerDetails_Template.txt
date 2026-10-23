@@ -1,0 +1,6 @@
+Customer Details
+
+Customer Name: {{customerName}}
+Customer Address: {{customerAddress}}
+Customer Email: {{customerEmail}}
+Customer Phone: {{customerPhone}}

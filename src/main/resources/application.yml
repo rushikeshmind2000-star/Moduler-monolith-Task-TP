@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: email-validation
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/email_validation_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:Rushee@2002}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: 8080
+
+abstract:
+  api:
+    base-url: https://emailreputation.abstractapi.com/v1/
+    key: 069f2277fb9a4303a95949ab8af0da14
+
+# ─── Google Drive Document Module ───────────────────────────────
+google:
+  drive:
+    # Path to the service-account JSON credentials file
+    credentials-file: ${GOOGLE_DRIVE_CREDENTIALS_FILE:src/main/resources/credentials/service-account.json}
+    # The Google Drive file ID of the master Word document
+    file-id: ${GOOGLE_DRIVE_FILE_ID:1SaPMenot0y6j_MH6kvW4EFVpiYRAhM0jKexl-IYYFcw}
+    # Application name shown in Google API logs
+    application-name: ${GOOGLE_DRIVE_APP_NAME:CustomerDocumentService}
