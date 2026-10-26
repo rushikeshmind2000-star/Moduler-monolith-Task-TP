@@ -14,6 +14,22 @@ spring:
       hibernate:
         format_sql: true
 
+  mail:
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:mindrushi55@gmail.com}
+    password: ${SPRING_MAIL_PASSWORD:nrneszmltpsxdafw}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+
 server:
   port: 8080
 
@@ -30,4 +46,18 @@ google:
     # The Google Drive file ID of the master Word document
     file-id: ${GOOGLE_DRIVE_FILE_ID:1SaPMenot0y6j_MH6kvW4EFVpiYRAhM0jKexl-IYYFcw}
     # Application name shown in Google API logs
-    application-name: ${GOOGLE_DRIVE_APP_NAME:CustomerDocumentService}
+    application-name: ${GOOGLE_DRIVE_APP_NAME:CustomerDocumentService}
+
+# ─── Offer Letter Module Configuration ──────────────────────────
+offer-letter:
+  company:
+    name: ${OFFER_LETTER_COMPANY_NAME:ABC Technologies Pvt. Ltd.}
+    address: ${OFFER_LETTER_COMPANY_ADDRESS:123 Business Park, Pune, Maharashtra – 411001}
+    email: ${OFFER_LETTER_COMPANY_EMAIL:hr@abctechnologies.com}
+    website: ${OFFER_LETTER_COMPANY_WEBSITE:www.abctechnologies.com}
+    phone: ${OFFER_LETTER_COMPANY_PHONE:+91 98765 43210}
+  hr:
+    sender-name: ${OFFER_LETTER_HR_NAME:Human Resources Department}
+    sender-email: ${SPRING_MAIL_USERNAME:hr@abctechnologies.com}
+    signatory-name: ${OFFER_LETTER_SIGNATORY_NAME:Priya Deshmukh}
+    signatory-title: ${OFFER_LETTER_SIGNATORY_TITLE:Human Resources Manager}
