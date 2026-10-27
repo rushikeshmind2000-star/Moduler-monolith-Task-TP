@@ -49,12 +49,17 @@ public class OfferLetterController {
     @PostMapping("/generate-and-send")
     @Operation(
             summary = "1. Generate Offer Letter & Send Email (Returns JSON Response)",
-            description = "Fills candidate details into an Offer Letter PDF, sends the congratulatory email with attached PDF, saves to DB, and returns a JSON response."
+            description = "Validates candidate email (format, disposable check, DNS MX), fills candidate details into Offer Letter PDF, dispatches email (async in background by default for sub-second API latency), saves record to DB, and returns a JSON response."
     )
-    @ApiResponse(responseCode = "201", description = "Offer letter generated, email dispatched, and record saved (returns JSON)")
-    @ApiResponse(responseCode = "400", description = "Validation error on required fields")
-    public ResponseEntity<OfferLetterResponse> generateAndSendOfferLetter(@Valid @RequestBody OfferLetterRequest request) {
-        log.info("API request received: generate-and-send offer letter for {}", request.getEmployeeName());
+    @ApiResponse(responseCode = "201", description = "Offer letter generated, email dispatched/queued, and record saved (returns JSON)")
+    @ApiResponse(responseCode = "400", description = "Validation error on required fields or invalid/undeliverable candidate email")
+    public ResponseEntity<OfferLetterResponse> generateAndSendOfferLetter(
+            @Valid @RequestBody OfferLetterRequest request,
+            @org.springframework.web.bind.annotation.RequestParam(value = "async", required = false) Boolean asyncParam) {
+        if (asyncParam != null) {
+            request.setAsyncEmail(asyncParam);
+        }
+        log.info("API request received: generate-and-send offer letter for {} (async={})", request.getEmployeeName(), request.getAsyncEmail());
         OfferLetterResponse response = offerLetterService.generateAndSendOfferLetter(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }

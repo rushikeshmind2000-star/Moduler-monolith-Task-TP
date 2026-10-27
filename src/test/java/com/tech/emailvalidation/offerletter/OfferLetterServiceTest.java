@@ -1,16 +1,20 @@
 package com.tech.emailvalidation.offerletter;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.concurrent.CompletableFuture;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.tech.emailvalidation.exception.EmailValidationException;
 import com.tech.emailvalidation.offerletter.config.OfferLetterProperties;
 import com.tech.emailvalidation.offerletter.dto.EmailDispatchResult;
 import com.tech.emailvalidation.offerletter.dto.OfferLetterRequest;
@@ -28,6 +33,7 @@ import com.tech.emailvalidation.offerletter.repository.OfferLetterRepository;
 import com.tech.emailvalidation.offerletter.service.EmailSenderService;
 import com.tech.emailvalidation.offerletter.service.OfferLetterServiceImpl;
 import com.tech.emailvalidation.offerletter.service.PdfGenerationServiceImpl;
+import com.tech.emailvalidation.service.EmailVerifierService;
 
 @ExtendWith(MockitoExtension.class)
 class OfferLetterServiceTest {
@@ -41,6 +47,9 @@ class OfferLetterServiceTest {
     @Mock
     private OfferLetterRepository offerLetterRepository;
 
+    @Mock
+    private EmailVerifierService emailVerifierService;
+
     private OfferLetterServiceImpl offerLetterService;
 
     @BeforeEach
@@ -51,7 +60,8 @@ class OfferLetterServiceTest {
                 pdfGenerationService,
                 emailSenderService,
                 offerLetterRepository,
-                properties
+                properties,
+                emailVerifierService
         );
     }
 
@@ -88,8 +98,8 @@ class OfferLetterServiceTest {
     }
 
     @Test
-    @DisplayName("Should generate offer letter, dispatch email, and persist record")
-    void testGenerateAndSendOfferLetter() {
+    @DisplayName("Should generate offer letter, dispatch async email in background, and persist record")
+    void testGenerateAndSendOfferLetterAsync() {
         OfferLetterRequest request = OfferLetterRequest.builder()
                 .employeeName("Jane Doe")
                 .email("jane.doe@example.com")
@@ -97,11 +107,10 @@ class OfferLetterServiceTest {
                 .packageAmount("18 LPA")
                 .designation("Lead Backend Architect")
                 .sendEmail(true)
+                .asyncEmail(true)
                 .build();
 
-        when(emailSenderService.sendOfferLetterEmail(
-                anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), any(byte[].class), anyString()
-        )).thenReturn(EmailDispatchResult.ok("Email delivered successfully"));
+        doNothing().when(emailVerifierService).validateCandidateEmail("jane.doe@example.com");
 
         when(offerLetterRepository.save(any(OfferLetter.class))).thenAnswer(invocation -> {
             OfferLetter entity = invocation.getArgument(0);
@@ -109,6 +118,10 @@ class OfferLetterServiceTest {
             entity.setCreatedAt(LocalDateTime.now());
             return entity;
         });
+
+        when(emailSenderService.sendOfferLetterEmailAsync(
+                eq(101L), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), any(byte[].class), anyString()
+        )).thenReturn(CompletableFuture.completedFuture(EmailDispatchResult.ok("Email delivered successfully")));
 
         OfferLetterResponse response = offerLetterService.generateAndSendOfferLetter(request);
 
@@ -121,9 +134,30 @@ class OfferLetterServiceTest {
         assertTrue(response.getEmailSent());
         assertEquals("SUCCESS", response.getStatus());
 
-        verify(emailSenderService).sendOfferLetterEmail(
-                anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), any(byte[].class), anyString()
+        verify(emailVerifierService).validateCandidateEmail("jane.doe@example.com");
+        verify(emailSenderService).sendOfferLetterEmailAsync(
+                eq(101L), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), any(byte[].class), anyString()
         );
         verify(offerLetterRepository).save(any(OfferLetter.class));
+    }
+
+    @Test
+    @DisplayName("Should reject offer letter generation when candidate email is invalid")
+    void testRejectInvalidEmail() {
+        OfferLetterRequest request = OfferLetterRequest.builder()
+                .employeeName("Bad Candidate")
+                .email("bad-candidate@invalid-domain-xyz.com")
+                .address("Pune")
+                .packageAmount("10 LPA")
+                .build();
+
+        doThrow(new EmailValidationException("Domain does not have valid mail exchange (MX) servers"))
+                .when(emailVerifierService).validateCandidateEmail("bad-candidate@invalid-domain-xyz.com");
+
+        EmailValidationException ex = assertThrows(EmailValidationException.class, () ->
+                offerLetterService.generateAndSendOfferLetter(request)
+        );
+
+        assertTrue(ex.getMessage().contains("mail exchange (MX) servers"));
     }
 }

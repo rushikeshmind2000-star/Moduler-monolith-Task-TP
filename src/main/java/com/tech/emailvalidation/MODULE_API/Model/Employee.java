@@ -1,9 +1,10 @@
 package com.tech.emailvalidation.MODULE_API.Model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+import jakarta.persistence.*;
+
+import java.util.ArrayList;
+import java.util.List;
 
 
 @Entity
@@ -21,6 +22,11 @@ public class Employee {
 
     private double Package;
 
+    @OneToMany( mappedBy = "employee" , cascade = CascadeType.ALL , orphanRemoval = true)
+    @JsonManagedReference
+    private List<EmployeeProject> projects;
+
+
     public Employee(int Emp_id, String Name , String Email, String Address, double Package){
 
         this.Emp_id=Emp_id;
@@ -28,6 +34,15 @@ public class Employee {
         this.Address=Address;
         this.Email=Email;
         this.Package=Package;
+    }
+
+
+    public List<EmployeeProject> getProjects() {
+        return projects;
+    }
+
+    public void setProjects(List<EmployeeProject> projects) {
+        this.projects = projects;
     }
 
     public Employee(){}

@@ -74,6 +74,10 @@ public class PdfGenerationServiceImpl implements PdfGenerationService {
     private final Font signoffSubFont = FontFactory.getFont(FontFactory.HELVETICA, 8.2f, TEXT_MUTED);
     private final Font footerTextFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 7f, ACCENT_BLUE);
 
+    // Pre-cache static logo and signature vector graphics to avoid repetitive Java2D rendering on every PDF request
+    private static final java.awt.Image CACHED_LOGO = createLogoImage();
+    private static final java.awt.Image CACHED_SIGNATURE = createSignatureImage();
+
     public PdfGenerationServiceImpl(OfferLetterProperties properties) {
         this.properties = properties;
     }
@@ -154,7 +158,7 @@ public class PdfGenerationServiceImpl implements PdfGenerationService {
         PdfPCell logoCell = new PdfPCell();
         logoCell.setBorder(PdfPCell.NO_BORDER);
         logoCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-        Image logoImg = Image.getInstance(createLogoImage(), null);
+        Image logoImg = Image.getInstance(CACHED_LOGO, null);
         logoImg.scaleToFit(38, 38);
         logoCell.addElement(logoImg);
         brandingTable.addCell(logoCell);
@@ -367,8 +371,8 @@ public class PdfGenerationServiceImpl implements PdfGenerationService {
         signoff.setSpacingAfter(2f);
         doc.add(signoff);
 
-        // Handwritten styled signature image
-        Image signatureImg = Image.getInstance(createSignatureImage(), null);
+        // Handwritten styled signature image (reused from pre-cached graphic)
+        Image signatureImg = Image.getInstance(CACHED_SIGNATURE, null);
         signatureImg.scaleToFit(90, 26);
         signatureImg.setSpacingAfter(2f);
         doc.add(signatureImg);
@@ -422,7 +426,7 @@ public class PdfGenerationServiceImpl implements PdfGenerationService {
         return trimmed;
     }
 
-    private java.awt.Image createLogoImage() {
+    private static java.awt.Image createLogoImage() {
         int w = 240, h = 240;
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2 = img.createGraphics();
@@ -461,7 +465,7 @@ public class PdfGenerationServiceImpl implements PdfGenerationService {
         return img;
     }
 
-    private java.awt.Image createSignatureImage() {
+    private static java.awt.Image createSignatureImage() {
         int w = 320, h = 100;
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2 = img.createGraphics();

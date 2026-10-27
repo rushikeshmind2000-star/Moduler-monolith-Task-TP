@@ -19,6 +19,7 @@ import com.tech.emailvalidation.offerletter.dto.OfferLetterRequest;
 import com.tech.emailvalidation.offerletter.dto.OfferLetterResponse;
 import com.tech.emailvalidation.offerletter.entity.OfferLetter;
 import com.tech.emailvalidation.offerletter.repository.OfferLetterRepository;
+import com.tech.emailvalidation.service.EmailVerifierService;
 
 @Service
 public class OfferLetterServiceImpl implements OfferLetterService {
@@ -29,22 +30,29 @@ public class OfferLetterServiceImpl implements OfferLetterService {
     private final EmailSenderService emailSenderService;
     private final OfferLetterRepository offerLetterRepository;
     private final OfferLetterProperties properties;
+    private final EmailVerifierService emailVerifierService;
 
     public OfferLetterServiceImpl(
             PdfGenerationService pdfGenerationService,
             EmailSenderService emailSenderService,
             OfferLetterRepository offerLetterRepository,
-            OfferLetterProperties properties) {
+            OfferLetterProperties properties,
+            EmailVerifierService emailVerifierService) {
         this.pdfGenerationService = pdfGenerationService;
         this.emailSenderService = emailSenderService;
         this.offerLetterRepository = offerLetterRepository;
         this.properties = properties;
+        this.emailVerifierService = emailVerifierService;
     }
 
     @Override
-    @Transactional
     public OfferLetterResponse generateAndSendOfferLetter(OfferLetterRequest request) {
-        log.info("Processing offer letter generation request for: {} ({})", request.getEmployeeName(), request.getEmail());
+        long startTime = System.currentTimeMillis();
+        String recipientEmail = request.getEmail().trim();
+        log.info("Processing offer letter generation request for: {} ({})", request.getEmployeeName(), recipientEmail);
+
+        // 1. Thorough Candidate Email Validation (syntax, disposable domains, and DNS MX checks)
+        emailVerifierService.validateCandidateEmail(recipientEmail);
 
         // Resolve default values if not provided
         String companyName = resolveCompanyName(request);
@@ -55,61 +63,100 @@ public class OfferLetterServiceImpl implements OfferLetterService {
         String referenceNumber = generateReferenceNumber();
         String pdfFileName = "Offer_Letter_" + sanitizeFileName(request.getEmployeeName()) + ".pdf";
 
-        // 1. Generate Offer Letter PDF
+        // 2. Generate Offer Letter PDF (utilizes pre-rendered branding assets)
         byte[] pdfBytes = pdfGenerationService.generateOfferLetterPdf(request, referenceNumber);
 
-        // 2. Dispatch Email if requested
-        boolean emailSent = false;
-        String emailStatusMessage = "Email dispatch disabled by request parameter";
+        boolean sendEmail = Boolean.TRUE.equals(request.getSendEmail());
+        boolean isAsync = Boolean.TRUE.equals(request.getAsyncEmail());
 
-        if (Boolean.TRUE.equals(request.getSendEmail())) {
-            EmailDispatchResult dispatchResult = emailSenderService.sendOfferLetterEmail(
-                    request.getEmail().trim(),
-                    request.getEmployeeName().trim(),
-                    designation,
-                    department,
-                    request.getPackageAmount().trim(),
-                    joiningDate,
-                    request.getAddress().trim(),
-                    companyName,
-                    pdfBytes,
-                    pdfFileName
-            );
-            emailSent = dispatchResult.isSuccess();
-            emailStatusMessage = dispatchResult.isSuccess()
-                    ? dispatchResult.getStatusMessage()
-                    : dispatchResult.getStatusMessage() + " (" + dispatchResult.getErrorDetails() + ")";
-        }
+        String initialStatusMessage = !sendEmail
+                ? "Email dispatch disabled by request parameter"
+                : (isAsync ? "Email queued for immediate background delivery" : "Dispatching email synchronously...");
 
         // 3. Persist Offer Letter entity to database
         OfferLetter entity = OfferLetter.builder()
                 .referenceNumber(referenceNumber)
                 .employeeName(request.getEmployeeName().trim())
-                .email(request.getEmail().trim())
+                .email(recipientEmail)
                 .address(request.getAddress().trim())
                 .packageAmount(request.getPackageAmount().trim())
                 .designation(designation)
                 .department(department)
                 .joiningDate(joiningDate)
                 .companyName(companyName)
-                .emailSent(emailSent)
-                .emailStatus(emailStatusMessage)
+                .emailSent(false)
+                .emailStatus(initialStatusMessage)
                 .pdfData(pdfBytes)
                 .createdAt(LocalDateTime.now())
                 .build();
 
         OfferLetter savedEntity = offerLetterRepository.save(entity);
 
-        // 4. Build response
-        String overallMessage = emailSent
-                ? "Offer letter generated successfully and dispatched to " + request.getEmail()
+        // 4. Dispatch Email if requested (Async for fast API response, Sync if async disabled)
+        boolean emailSent = false;
+        String emailStatusMessage = initialStatusMessage;
+
+        if (sendEmail) {
+            if (isAsync) {
+                // Async dispatch: hands off to dedicated thread pool, updates DB on completion
+                emailSenderService.sendOfferLetterEmailAsync(
+                        savedEntity.getId(),
+                        recipientEmail,
+                        request.getEmployeeName().trim(),
+                        designation,
+                        department,
+                        request.getPackageAmount().trim(),
+                        joiningDate,
+                        request.getAddress().trim(),
+                        companyName,
+                        pdfBytes,
+                        pdfFileName
+                );
+                emailSent = true;
+                emailStatusMessage = "Email queued and dispatched asynchronously via background worker";
+            } else {
+                // Synchronous dispatch
+                EmailDispatchResult dispatchResult = emailSenderService.sendOfferLetterEmail(
+                        recipientEmail,
+                        request.getEmployeeName().trim(),
+                        designation,
+                        department,
+                        request.getPackageAmount().trim(),
+                        joiningDate,
+                        request.getAddress().trim(),
+                        companyName,
+                        pdfBytes,
+                        pdfFileName
+                );
+                emailSent = dispatchResult.isSuccess();
+                emailStatusMessage = dispatchResult.isSuccess()
+                        ? dispatchResult.getStatusMessage()
+                        : dispatchResult.getStatusMessage() + " (" + dispatchResult.getErrorDetails() + ")";
+
+                // Update entity in DB with synchronous status
+                offerLetterRepository.updateEmailDeliveryStatus(savedEntity.getId(), emailSent, emailStatusMessage);
+            }
+        }
+
+        long totalElapsed = System.currentTimeMillis() - startTime;
+        log.info("Completed offer letter API request for {} in {} ms (asyncEmail={})",
+                request.getEmployeeName(), totalElapsed, isAsync);
+
+        // 5. Build response
+        String overallMessage = sendEmail
+                ? (isAsync
+                    ? "Offer letter generated successfully. Email is being dispatched in the background to " + recipientEmail
+                    : (emailSent
+                        ? "Offer letter generated successfully and dispatched to " + recipientEmail
+                        : "Offer letter generated successfully. Note: " + emailStatusMessage))
                 : "Offer letter generated successfully. Note: " + emailStatusMessage;
 
-        return mapToResponse(savedEntity, overallMessage);
+        return mapToResponse(savedEntity, overallMessage, emailSent, emailStatusMessage);
     }
 
     @Override
     public byte[] generatePdfOnly(OfferLetterRequest request) {
+        emailVerifierService.validateCandidateEmail(request.getEmail());
         String referenceNumber = generateReferenceNumber();
         return pdfGenerationService.generateOfferLetterPdf(request, referenceNumber);
     }
@@ -136,11 +183,11 @@ public class OfferLetterServiceImpl implements OfferLetterService {
     public List<OfferLetterResponse> getAllOfferLetters() {
         return offerLetterRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
-                .map(entity -> mapToResponse(entity, "Retrieved successfully"))
+                .map(entity -> mapToResponse(entity, "Retrieved successfully", entity.getEmailSent(), entity.getEmailStatus()))
                 .collect(Collectors.toList());
     }
 
-    private OfferLetterResponse mapToResponse(OfferLetter entity, String message) {
+    private OfferLetterResponse mapToResponse(OfferLetter entity, String message, Boolean emailSent, String emailStatus) {
         return OfferLetterResponse.builder()
                 .id(entity.getId())
                 .referenceNumber(entity.getReferenceNumber())
@@ -154,8 +201,8 @@ public class OfferLetterServiceImpl implements OfferLetterService {
                 .companyName(entity.getCompanyName())
                 .status("SUCCESS")
                 .message(message)
-                .emailSent(entity.getEmailSent())
-                .emailDeliveryStatus(entity.getEmailStatus())
+                .emailSent(emailSent)
+                .emailDeliveryStatus(emailStatus)
                 .generatedAt(entity.getCreatedAt())
                 .pdfDownloadUrl("/api/offer-letter/" + entity.getId() + "/download")
                 .build();

@@ -1,5 +1,7 @@
 package com.tech.emailvalidation.offerletter.service;
 
+import java.util.concurrent.CompletableFuture;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -7,10 +9,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import com.tech.emailvalidation.offerletter.config.OfferLetterProperties;
 import com.tech.emailvalidation.offerletter.dto.EmailDispatchResult;
+import com.tech.emailvalidation.offerletter.repository.OfferLetterRepository;
 
 import jakarta.mail.internet.MimeMessage;
 
@@ -21,13 +25,67 @@ public class EmailSenderServiceImpl implements EmailSenderService {
 
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
     private final OfferLetterProperties properties;
+    private final OfferLetterRepository offerLetterRepository;
 
     @Value("${spring.mail.username:}")
     private String mailUsername;
 
-    public EmailSenderServiceImpl(ObjectProvider<JavaMailSender> mailSenderProvider, OfferLetterProperties properties) {
+    public EmailSenderServiceImpl(
+            ObjectProvider<JavaMailSender> mailSenderProvider,
+            OfferLetterProperties properties,
+            OfferLetterRepository offerLetterRepository) {
         this.mailSenderProvider = mailSenderProvider;
         this.properties = properties;
+        this.offerLetterRepository = offerLetterRepository;
+    }
+
+    @Async("mailTaskExecutor")
+    @Override
+    public CompletableFuture<EmailDispatchResult> sendOfferLetterEmailAsync(
+            Long offerLetterId,
+            String recipientEmail,
+            String recipientName,
+            String designation,
+            String department,
+            String packageAmount,
+            String joiningDate,
+            String address,
+            String companyName,
+            byte[] pdfBytes,
+            String pdfFileName) {
+
+        long startTime = System.currentTimeMillis();
+        log.info("Async email dispatch started in background thread for offer letter #{} to {}", offerLetterId, recipientEmail);
+
+        EmailDispatchResult result = sendOfferLetterEmail(
+                recipientEmail,
+                recipientName,
+                designation,
+                department,
+                packageAmount,
+                joiningDate,
+                address,
+                companyName,
+                pdfBytes,
+                pdfFileName
+        );
+
+        long duration = System.currentTimeMillis() - startTime;
+        log.info("Async email dispatch completed in {} ms for offer letter #{} (success={})",
+                duration, offerLetterId, result.isSuccess());
+
+        if (offerLetterId != null) {
+            try {
+                String statusMsg = result.isSuccess()
+                        ? result.getStatusMessage() + " (delivered in " + duration + " ms)"
+                        : result.getStatusMessage() + " (" + result.getErrorDetails() + ")";
+                offerLetterRepository.updateEmailDeliveryStatus(offerLetterId, result.isSuccess(), statusMsg);
+            } catch (Exception e) {
+                log.error("Failed to update async email delivery status for offer letter #{}", offerLetterId, e);
+            }
+        }
+
+        return CompletableFuture.completedFuture(result);
     }
 
     @Override
@@ -43,6 +101,7 @@ public class EmailSenderServiceImpl implements EmailSenderService {
             byte[] pdfBytes,
             String pdfFileName) {
 
+        long startTime = System.currentTimeMillis();
         log.info("Preparing to send Offer Letter email to {} ({})", recipientName, recipientEmail);
 
         JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
@@ -89,7 +148,8 @@ public class EmailSenderServiceImpl implements EmailSenderService {
             }
 
             mailSender.send(message);
-            log.info("Offer letter email sent successfully to {}", recipientEmail);
+            long elapsed = System.currentTimeMillis() - startTime;
+            log.info("Offer letter email sent successfully to {} in {} ms", recipientEmail, elapsed);
 
             return EmailDispatchResult.ok("Offer letter email successfully delivered to " + recipientEmail);
         } catch (Exception e) {

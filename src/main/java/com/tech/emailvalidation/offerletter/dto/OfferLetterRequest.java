@@ -66,4 +66,9 @@ public class OfferLetterRequest {
     @JsonProperty("sendEmail")
     @Schema(description = "Whether to immediately dispatch congratulatory email with attached PDF", defaultValue = "true")
     private Boolean sendEmail = true;
+
+    @Builder.Default
+    @JsonProperty("asyncEmail")
+    @Schema(description = "Whether to dispatch email asynchronously in background for sub-second API response time", defaultValue = "true")
+    private Boolean asyncEmail = true;
 }

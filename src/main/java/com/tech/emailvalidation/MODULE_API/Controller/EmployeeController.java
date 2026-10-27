@@ -19,7 +19,7 @@ public class EmployeeController {
 
 
     @PostMapping("/add")
-    public Employee AddEmp(Employee emp){
+    public Employee AddEmp(@RequestBody Employee emp){
         return service.AddEmployee(emp);
     }
 
