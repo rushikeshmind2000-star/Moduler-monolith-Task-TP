@@ -1,4 +1,4 @@
 package com.tech.emailvalidation.Java17FeautesModule.Entity;
 
-public interface PushNotififcation {
+public non-sealed class PushNotififcation implements Notification{
 }

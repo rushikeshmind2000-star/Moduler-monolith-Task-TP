@@ -1,4 +1,5 @@
 package com.tech.emailvalidation.Java17FeautesModule.Entity;
 
-public interface EmailNotification {
+public final class EmailNotification implements  Notification
+{
 }

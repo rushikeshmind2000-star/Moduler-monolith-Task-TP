@@ -1,8 +1,6 @@
     package com.tech.emailvalidation.MODULE_API.GlobalException;
 
-    import com.tech.emailvalidation.MODULE_API.Model.Employee;
     import org.springframework.http.HttpStatus;
-    import org.springframework.http.HttpStatusCode;
     import org.springframework.http.ResponseEntity;
     import org.springframework.web.bind.annotation.ExceptionHandler;
     import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -12,7 +10,7 @@
     import java.util.Map;
 
     @RestControllerAdvice
-    public class GlobalExceptionHandler {
+    public class GlobalExceptionHandller {
 
 
 
@@ -29,4 +27,29 @@
             return new ResponseEntity<>(reponse,HttpStatus.NOT_FOUND);
             }
 
+
+            @ExceptionHandler(InvalidEmployeeDataException.class)
+            public ResponseEntity<Map<String , Object>> InvalidEmployeeDataExc(InvalidEmployeeDataException ex){
+
+            Map<String, Object> response=new HashMap<>();
+
+            response.put("timestampe",LocalDateTime.now());
+            response.put("Status" ,HttpStatus.BAD_REQUEST.value());
+            response.put("error","Bad Request");
+            response.put("Message" ,ex.getMessage());
+
+            return new ResponseEntity<>(response , HttpStatus.BAD_REQUEST);
+            }
+
+            @ExceptionHandler(ResourceNotFoundException.class)
+            public ResponseEntity<Map<String, Object>> handleResourceNotFound(ResourceNotFoundException ex) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("timestamp", LocalDateTime.now());
+                response.put("Status", HttpStatus.NOT_FOUND.value());
+                response.put("error", "Not Found");
+                response.put("message", ex.getMessage());
+                return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+            }
+
     }
+

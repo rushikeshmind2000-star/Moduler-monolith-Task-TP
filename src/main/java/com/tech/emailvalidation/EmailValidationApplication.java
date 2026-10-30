@@ -8,6 +8,7 @@ public class EmailValidationApplication {
 
 	public static void main(String[] args)
     {
+
 		SpringApplication.run(EmailValidationApplication.class, args);
 	}
 

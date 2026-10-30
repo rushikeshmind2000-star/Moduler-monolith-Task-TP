@@ -1,6 +1,4 @@
-package com.tech.emailvalidation.Java17FeautesModule.test;
-
-import com.tech.emailvalidation.Java17FeautesModule.Entity.Notification;
+package com.tech.emailvalidation.Java17FeautesModule.Entity;
 
 public  final class CustomeNotification implements Notification {
 }

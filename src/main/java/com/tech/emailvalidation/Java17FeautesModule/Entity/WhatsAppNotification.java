@@ -1,4 +1,4 @@
 package com.tech.emailvalidation.Java17FeautesModule.Entity;
 
-public interface WhatsAppNotification {
+public final class WhatsAppNotification extends SMSNotification {
 }
