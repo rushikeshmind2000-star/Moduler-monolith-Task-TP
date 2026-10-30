@@ -45,9 +45,18 @@ public class AddressService {
         return addressRepo.save(existingAddress);
     }
 
-    public String deleteAddressById(int addressId) {
-        Address address = getAddressById(addressId);
-        addressRepo.delete(address);
-        return "Deleted Address with ID: " + addressId;
+//    public String deleteAddressById(int addressId) {
+//        Address address = getAddressById(addressId);
+//        addressRepo.delete(address);
+//        return "Deleted Address with ID: " + addressId;
+//    }
+
+    public String DeleteAddressByID(int Id){
+        Address  a=getAddressById(Id);
+
+        addressRepo.delete(a);
+
+        return "Deleted this Address "+Id;
     }
+
 }
