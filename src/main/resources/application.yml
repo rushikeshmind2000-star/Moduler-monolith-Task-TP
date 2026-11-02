@@ -63,4 +63,19 @@ offer-letter:
     sender-name: ${OFFER_LETTER_HR_NAME:Human Resources Department}
     sender-email: ${SPRING_MAIL_USERNAME:hr@abctechnologies.com}
     signatory-name: ${OFFER_LETTER_SIGNATORY_NAME:Priya Deshmukh}
-    signatory-title: ${OFFER_LETTER_SIGNATORY_TITLE:Human Resources Manager}
+    signatory-title: ${OFFER_LETTER_SIGNATORY_TITLE:Human Resources Manager}
+
+
+sonar:
+  projectKey: "rushikeshmind2000-star_Moduler-monolith-Task-TP"
+  organization: "rushikeshmind"
+  host:
+    url: "https://sonarcloud.io"
+
+  sources: "src/main/java"
+  tests: "src/test/java"
+  java:
+    binaries: "target/classes"
+    source: "17"
+
+  sourceEncoding: "UTF-8"
