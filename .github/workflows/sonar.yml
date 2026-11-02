@@ -1,0 +1,38 @@
+name: SonarQube Cloud Analysis
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonar:
+    name: Build and Analyze
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+
+      - name: Build Project
+        run: mvn clean verify
+
+      - name: SonarQube Cloud Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          mvn org.sonarsource.scanner.maven:sonar-maven-plugin:5.5.0.6356:sonar
+          -Dsonar.projectKey=rushikeshmind2000_Moduler-monolith-Task-TP
+          -Dsonar.organization=rushikeshmind
+          -Dsonar.host.url=https://sonarcloud.io
